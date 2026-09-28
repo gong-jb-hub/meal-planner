@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#4472C4">
+<title>控糖食谱点餐</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+     background:#f4f6fa;color:#222;font-size:16px;padding-bottom:76px}
+header{background:#4472C4;color:#fff;padding:12px 14px;position:sticky;top:0;z-index:10;
+       box-shadow:0 2px 6px rgba(0,0,0,.15)}
+header h1{margin:0;font-size:17px}
+header .sub{font-size:12px;opacity:.9;margin-top:3px}
+#errorBar{display:none;background:#C00000;color:#fff;padding:8px 14px;font-size:13px}
+.meal{margin:10px;background:#fff;border-radius:12px;overflow:hidden;
+      box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.meal-head{padding:10px 12px;font-weight:bold;font-size:15px;display:flex;
+           justify-content:space-between;flex-wrap:wrap;gap:4px}
+.meal-head.lunch{background:#FFF2CC}
+.meal-head.dinner{background:#E2EFDA}
+.meal-head .stat{font-size:12px;font-weight:normal;color:#555}
+.slot{padding:8px 12px;border-top:1px solid #eee}
+.slot-label{font-size:12px;color:#666;margin-bottom:6px;font-weight:bold}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{padding:6px 10px;border-radius:14px;background:#eef1f6;font-size:13px;
+      border:1.5px solid transparent;cursor:pointer;user-select:none}
+.chip.selected{background:#4472C4;color:#fff;border-color:#2f5aa0}
+.chip.spicy::after{content:"🌶";margin-left:3px;font-size:11px}
+.chip.used{opacity:.35;text-decoration:line-through}
+.chip.optional{border-style:dashed}
+.summary{padding:8px 12px;background:#fafbfd;font-size:12px;color:#444;
+         border-top:1px solid #eee;line-height:1.6}
+.warn{color:#C00000;font-weight:bold}
+.ok{color:#2e7d32}
+.day-total{margin:10px;padding:12px;background:#FFF8E1;border-radius:12px;font-size:13px;line-height:1.7}
+.day-total h3{margin:0 0 6px;font-size:14px}
+.actions{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:8px 10px;
+         display:flex;gap:6px;box-shadow:0 -2px 8px rgba(0,0,0,.1);z-index:20}
+.actions button{flex:1;padding:10px 4px;border:none;border-radius:8px;font-size:13px;
+                font-weight:bold;cursor:pointer}
+.btn-primary{background:#4472C4;color:#fff}
+.btn-ghost{background:#eef1f6;color:#333}
+.btn-green{background:#2e7d32;color:#fff}
+.list{margin:10px;background:#fff;border-radius:12px;padding:12px}
+.list h3{margin:0 0 8px;font-size:14px}
+.list pre{white-space:pre-wrap;font-family:inherit;font-size:13px;margin:0;line-height:1.7}
+.modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;
+            align-items:center;justify-content:center;padding:16px}
+.modal-mask.on{display:flex}
+.modal{background:#fff;border-radius:12px;padding:16px;max-width:90%;width:420px;max-height:80vh;overflow:auto}
+.modal h3{margin:0 0 10px;font-size:15px}
+.modal textarea{width:100%;height:180px;font-size:13px;padding:8px;border:1px solid #ddd;
+                border-radius:8px;font-family:inherit;resize:vertical;box-sizing:border-box}
+.modal .row{display:flex;gap:8px;margin-top:10px}
+.modal .row button{flex:1;padding:10px;border:none;border-radius:8px;font-size:14px;font-weight:bold;cursor:pointer}
+.share-tip{font-size:12px;color:#666;margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <h1>控糖食谱点餐</h1>
+  <div class="sub" id="dateSub">加载中…</div>
+</header>
+<div id="errorBar"></div>
+<div id="app"></div>
+<div class="day-total" id="dayTotal"></div>
+<div class="list" id="shopList" style="display:none;">
+  <h3>今日买菜清单</h3>
+  <pre id="shopText"></pre>
+</div>
+<div class="actions">
+  <button class="btn-ghost" onclick="showShop()">买菜</button>
+  <button class="btn-green" onclick="showShareMenu()">发微信</button>
+  <button class="btn-ghost" onclick="prevDay()">前一天</button>
+  <button class="btn-ghost" onclick="nextDay()">后一天</button>
+  <button class="btn-primary" onclick="saveDay()">保存</button>
+</div>
+
+<!-- 分享弹窗 -->
+<div class="modal-mask" id="shareMask" onclick="if(event.target===this)closeShare()">
+  <div class="modal">
+    <h3>发给家人</h3>
+    <textarea id="shareText" readonly></textarea>
+    <div class="share-tip">方式一：点"复制文字"，粘贴到微信发送</div>
+    <div class="share-tip">方式二：点"生成链接"，把链接发到微信，家人点开就能看到菜单</div>
+    <div class="row">
+      <button class="btn-primary" onclick="copyShareText()">复制文字</button>
+      <button class="btn-green" onclick="copyShareLink()">生成链接</button>
+    </div>
+    <div class="row">
+      <button class="btn-ghost" onclick="closeShare()">关闭</button>
+    </div>
+    <div class="share-tip" id="shareMsg" style="color:#2e7d32"></div>
+  </div>
+</div>
+
+<script>
+function showError(msg){
+  var bar=document.getElementById("errorBar");
+  bar.style.display="block";bar.textContent="脚本错误："+msg;
+}
+window.onerror=function(msg,url,line){showError(msg+" (行 "+line+")");return false;};
+
+// ============ 菜品库 ============
+var DISHES=[
+  // 主蛋白
+  {n:"清蒸鲈鱼",r:"main",p:22,c:2,i:"鱼",mg:"鱼",s:false,buy:["鲈鱼"]},
+  {n:"清蒸多宝鱼",r:"main",p:23,c:1,i:"鱼",mg:"鱼",s:false,buy:["多宝鱼"]},
+  {n:"白灼虾仁",r:"main",p:20,c:1,i:"虾",mg:"虾",s:false,buy:["虾仁"]},
+  {n:"清炒虾仁芦笋",r:"main",p:19,c:4,i:"虾",mg:"虾",s:false,buy:["虾仁","芦笋"]},
+  {n:"葱爆香辣虾",r:"main",p:20,c:3,i:"虾",mg:"虾",s:true,buy:["虾仁","大葱","干辣椒"]},
+  {n:"胡萝卜肉丝",r:"main",p:20,c:6,i:"猪",mg:"肉丝",s:true,buy:["猪里脊","胡萝卜"]},
+  {n:"芹菜肉丝",r:"main",p:21,c:4,i:"猪",mg:"肉丝",s:true,buy:["猪里脊","芹菜"]},
+  {n:"蒜薹肉丝",r:"main",p:20,c:5,i:"猪",mg:"肉丝",s:true,buy:["猪里脊","蒜薹"]},
+  {n:"青椒肉丝",r:"main",p:20,c:4,i:"猪",mg:"肉丝",s:true,buy:["猪里脊","青椒"]},
+  {n:"莴笋肉丝",r:"main",p:20,c:4,i:"猪",mg:"肉丝",s:true,buy:["猪里脊","莴笋"]},
+  {n:"洋葱肉丝",r:"main",p:20,c:6,i:"猪",mg:"肉丝",s:true,buy:["猪里脊","洋葱"]},
+  {n:"海带炖排骨",r:"main",p:22,c:3,i:"猪",mg:"排骨",s:false,buy:["排骨","海带"]},
+  {n:"黄豆炖排骨",r:"main",p:24,c:6,i:"猪",mg:"排骨",s:false,buy:["排骨","黄豆"]},
+  {n:"萝卜炖排骨",r:"main",p:21,c:3,i:"猪",mg:"排骨",s:false,buy:["排骨","白萝卜"]},
+  {n:"干锅排骨",r:"main",p:22,c:4,i:"猪",mg:"排骨",s:true,buy:["排骨","青椒","干辣椒"]},
+  {n:"辣子鸡",r:"main",p:22,c:3,i:"鸡",mg:"鸡",s:true,buy:["鸡腿肉","干辣椒"]},
+  {n:"香菜牛肉",r:"main",p:25,c:3,i:"牛",mg:"牛",s:true,buy:["牛里脊","香菜"]},
+  {n:"番茄牛肉",r:"main",p:24,c:6,i:"牛",mg:"牛",s:false,buy:["牛腩","番茄"]},
+  {n:"红烧牛肉（少糖）",r:"main",p:25,c:8,i:"牛",mg:"牛",s:true,buy:["牛腩"]},
+  {n:"萝卜炖牛肉",r:"main",p:24,c:4,i:"牛",mg:"牛",s:false,buy:["牛腩","白萝卜"]},
+  // 副蛋白
+  {n:"白菜豆腐汤",r:"sub",p:11,c:5,i:"豆",s:false,buy:["白菜","豆腐"]},
+  {n:"虾仁蒸蛋",r:"sub",p:14,c:2,i:"蛋",s:false,buy:["虾仁","鸡蛋"]},
+  {n:"蒸蛋",r:"sub",p:12,c:2,i:"蛋",s:false,buy:["鸡蛋"]},
+  {n:"黄瓜炒蛋",r:"sub",p:12,c:4,i:"蛋",s:false,buy:["黄瓜","鸡蛋"]},
+  {n:"番茄炒蛋",r:"sub",p:13,c:5,i:"蛋",s:false,buy:["番茄","鸡蛋"]},
+  {n:"木耳炒蛋",r:"sub",p:12,c:5,i:"蛋",s:false,buy:["木耳","鸡蛋"]},
+  {n:"凉拌豆腐皮",r:"sub",p:15,c:4,i:"豆",s:true,buy:["豆腐皮"]},
+  {n:"清炒毛豆",r:"sub",p:11,c:8,i:"豆",s:false,buy:["毛豆"]},
+  {n:"香干肉丝",r:"sub",p:16,c:6,i:"猪",s:true,buy:["香干","猪里脊"]},
+  {n:"番茄炖豆腐",r:"sub",p:11,c:6,i:"豆",s:false,buy:["番茄","豆腐"]},
+  {n:"家常豆腐（少油版）",r:"sub",p:13,c:6,i:"豆",s:true,buy:["北豆腐","青椒","木耳"]},
+  {n:"豆腐蒸肉末",r:"sub",p:16,c:4,i:"豆",s:false,buy:["嫩豆腐","猪肉末"]},
+  // 蔬菜
+  {n:"清炒菠菜",r:"veg",p:3,c:4,i:"素",s:false,buy:["菠菜"]},
+  {n:"清炒包菜",r:"veg",p:2,c:4,i:"素",s:false,buy:["包包菜"]},
+  {n:"白灼西兰花",r:"veg",p:4,c:5,i:"素",s:false,buy:["西兰花"]},
+  {n:"凉拌黄瓜",r:"veg",p:1,c:3,i:"素",s:true,buy:["黄瓜"]},
+  {n:"清炒莴笋",r:"veg",p:2,c:4,i:"素",s:false,buy:["莴笋"]},
+  {n:"蒜蓉空心菜",r:"veg",p:2,c:4,i:"素",s:false,buy:["空心菜"]},
+  {n:"清炒西葫芦",r:"veg",p:2,c:4,i:"素",s:false,buy:["西葫芦"]},
+  {n:"凉拌海带丝",r:"veg",p:2,c:5,i:"素",s:true,buy:["海带丝"]},
+  {n:"清炒秋葵",r:"veg",p:3,c:5,i:"素",s:false,buy:["秋葵"]},
+  {n:"娃娃菜烧汤",r:"veg",p:2,c:4,i:"素",s:false,buy:["娃娃菜"]},
+  {n:"炒油麦菜",r:"veg",p:2,c:4,i:"素",s:false,buy:["油麦菜"]},
+  {n:"炒生菜",r:"veg",p:2,c:3,i:"素",s:false,buy:["生菜"]},
+  {n:"炒红薯尖",r:"veg",p:3,c:4,i:"素",s:false,buy:["红薯尖"]},
+  {n:"豌豆尖汤",r:"veg",p:3,c:4,i:"素",s:false,buy:["豌豆尖"]},
+  {n:"清炒丝瓜",r:"veg",p:2,c:4,i:"素",s:false,buy:["丝瓜"]},
+  {n:"蒜蓉苋菜",r:"veg",p:3,c:4,i:"素",s:false,buy:["苋菜"]},
+  {n:"紫菜蛋花汤",r:"veg",p:4,c:3,i:"蛋",s:false,buy:["紫菜","鸡蛋"]},
+  {n:"冬瓜汤",r:"veg",p:1,c:3,i:"素",s:false,buy:["冬瓜"]},
+  {n:"菌菇汤",r:"veg",p:3,c:4,i:"素",s:false,buy:["金针菇","白玉菇"]},
+  {n:"凉拌金针菇",r:"veg",p:3,c:5,i:"素",s:true,buy:["金针菇"]}
+];
+var STAPLES=[
+  {n:"糙米饭",raw:"50-60g",c:40,shop:["糙米"]},
+  {n:"玉米米饭",raw:"50-60g",c:42,shop:["玉米","大米"]},
+  {n:"红薯米饭",raw:"薯80+米30",c:42,shop:["红薯","大米"]},
+  {n:"洋芋米饭",raw:"薯80+米30",c:44,shop:["土豆","大米"]}
+];
+var ROLES={main:"主蛋白",sub:"副蛋白/豆蛋",veg:"蔬菜",extra:"加菜（可选）"};
+var ROLE_ORDER=["main","sub","veg","extra"];
+var MEAT_FORBID=["牛","猪","鸡","鱼","虾"];
+
+function pad2(n){return n<10?"0"+n:""+n;}
+function todayStr(){var d=new Date();return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());}
+function shiftDate(str,delta){var p=str.split("-");var dt=new Date(+p[0],+p[1]-1,+p[2]+delta);
+  return dt.getFullYear()+"-"+pad2(dt.getMonth()+1)+"-"+pad2(dt.getDate());}
+function weekdayCN(str){var p=str.split("-");var dt=new Date(+p[0],+p[1]-1,+p[2]);
+  return ["周日","周一","周二","周三","周四","周五","周六"][dt.getDay()];}
+
+var KEY="meal_planner_v1";
+var store={};var storageOK=true;
+function loadStore(){
+  try{var raw=localStorage.getItem(KEY);store=raw?JSON.parse(raw):{};}
+  catch(e){storageOK=false;store={};}
+}
+function saveLocal(){
+  if(!storageOK)return;
+  try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}
+}
+
+var curDate=todayStr();
+function emptyMeal(){return{main:null,sub:null,veg:null,extra:null,staple:null};}
+function getDay(date){
+  if(!store[date])store[date]={lunch:emptyMeal(),dinner:emptyMeal()};
+  return store[date];
+}
+
+function getYesterdayMeats(date){
+  var y=shiftDate(date,-1);var s={};
+  if(!store[y])return s;
+  ["lunch","dinner"].forEach(function(m){
+    ROLE_ORDER.forEach(function(r){
+      var idx=store[y][m][r];
+      if(idx!=null){var ing=DISHES[idx].i;
+        if(MEAT_FORBID.indexOf(ing)>=0)s[ing]=true;}
+    });
+  });
+  return s;
+}
+function countRecentIngredient(date,ing,days){
+  days=days||7;var cnt=0;
+  for(var k=1;k<=days;k++){
+    var d=shiftDate(date,-k);
+    if(!store[d])continue;
+    ["lunch","dinner"].forEach(function(m){
+      ROLE_ORDER.forEach(function(r){
+        var idx=store[d][m][r];
+        if(idx!=null&&DISHES[idx].i===ing)cnt++;
+      });
+    });
+  }
+  return cnt;
+}
+function getUsedNamesInDay(date,excludeMeal){
+  var s={};var day=getDay(date);
+  ["lunch","dinner"].forEach(function(m){
+    if(m===excludeMeal)return;
+    ROLE_ORDER.forEach(function(r){
+      var idx=day[m][r];if(idx!=null)s[DISHES[idx].n]=true;
+    });
+  });
+  return s;
+}
+function getUsedIngredientsInDay(date,excludeMeal){
+  var s={};var day=getDay(date);
+  ["lunch","dinner"].forEach(function(m){
+    if(m===excludeMeal)return;
+    ROLE_ORDER.forEach(function(r){
+      var idx=day[m][r];
+      if(idx!=null){var ing=DISHES[idx].i;
+        if(ing!=="素")s[ing]=true;}
+    });
+  });
+  return s;
+}
+function getSpicyCount(date,meal){
+  var day=getDay(date);var cnt=0;
+  ROLE_ORDER.forEach(function(r){
+    var idx=day[meal][r];
+    if(idx!=null&&DISHES[idx].s)cnt++;
+  });
+  return cnt;
+}
+function getMealStat(date,meal){
+  var day=getDay(date);var p=0,c=0;
+  ROLE_ORDER.forEach(function(r){
+    var idx=day[meal][r];
+    if(idx!=null){p+=DISHES[idx].p;c+=DISHES[idx].c;}
+  });
+  if(day[meal].staple!=null)c+=STAPLES[day[meal].staple].c;
+  return{p:p,c:c};
+}
+
+function render(){
+  try{
+    document.getElementById("dateSub").textContent=curDate+" "+weekdayCN(curDate);
+    var app=document.getElementById("app");app.innerHTML="";
+    ["lunch","dinner"].forEach(function(meal){
+      app.appendChild(renderMealBlock(meal));
+    });
+    renderDayTotal();
+    document.getElementById("shopList").style.display="none";
+  }catch(e){showError("render: "+e.message);}
+}
+
+function renderMealBlock(meal){
+  var box=document.createElement("div");box.className="meal";
+  var mealName=(meal==="lunch")?"中餐":"晚餐";
+  var stat=getMealStat(curDate,meal);
+  var spicy=getSpicyCount(curDate,meal);
+  var spicyTag=(spicy===1)?' <span class="ok">辣1</span>':' <span class="warn">辣'+spicy+'</span>';
+  var head=document.createElement("div");
+  head.className="meal-head "+meal;
+  head.innerHTML='<span>'+mealName+'</span><span class="stat">蛋白'+stat.p+'g · 碳水'+stat.c+'g'+spicyTag+'</span>';
+  box.appendChild(head);
+  ROLE_ORDER.forEach(function(role){box.appendChild(renderSlot(meal,role));});
+  box.appendChild(renderStaple(meal));
+  box.appendChild(renderTips(meal));
+  return box;
+}
+
+function renderSlot(meal,role){
+  var slot=document.createElement("div");slot.className="slot";
+  var day=getDay(curDate);
+  var usedNames=getUsedNamesInDay(curDate,meal);
+  var usedIngs=getUsedIngredientsInDay(curDate,meal);
+  var forbidden=getYesterdayMeats(curDate);
+  var label=document.createElement("div");label.className="slot-label";
+  label.textContent=ROLES[role];
+  slot.appendChild(label);
+  var chips=document.createElement("div");chips.className="chips";
+
+  if(role==="extra"){
+    var chipNone=document.createElement("div");
+    chipNone.className="chip";
+    chipNone.textContent="不加";
+    if(day[meal].extra==null)chipNone.classList.add("selected");
+    chipNone.onclick=function(){day[meal].extra=null;saveLocal();render();};
+    chips.appendChild(chipNone);
+  }
+
+  DISHES.forEach(function(d,idx){
+    var inRole=false;
+    if(role==="extra")inRole=(d.r==="sub"||d.r==="veg");
+    else inRole=(d.r===role);
+    if(!inRole)return;
+    var chip=document.createElement("div");chip.className="chip";
+    if(role==="extra")chip.classList.add("optional");
+    if(d.s)chip.classList.add("spicy");
+    chip.textContent=d.n;
+    var selected=(day[meal][role]===idx);
+    if(selected)chip.classList.add("selected");
+    var conflict=false;
+    if(usedNames[d.n])conflict=true;
+    if(d.i!=="素"&&usedIngs[d.i])conflict=true;
+    if(MEAT_FORBID.indexOf(d.i)>=0&&forbidden[d.i])conflict=true;
+    if(!selected&&countRecentIngredient(curDate,d.i)>=4)conflict=true;
+    if(conflict)chip.classList.add("used");
+    chip.onclick=function(){
+      if(day[meal][role]===idx)day[meal][role]=null;
+      else day[meal][role]=idx;
+      saveLocal();render();
+    };
+    chips.appendChild(chip);
+  });
+  slot.appendChild(chips);
+  return slot;
+}
+
+function renderStaple(meal){
+  var slot=document.createElement("div");slot.className="slot";
+  var day=getDay(curDate);
+  var label=document.createElement("div");label.className="slot-label";
+  label.textContent="主食";slot.appendChild(label);
+  var chips=document.createElement("div");chips.className="chips";
+  STAPLES.forEach(function(s,idx){
+    var chip=document.createElement("div");chip.className="chip";
+    chip.textContent=s.n+"("+s.raw+")";
+    if(day[meal].staple===idx)chip.classList.add("selected");
+    chip.onclick=function(){
+      day[meal].staple=(day[meal].staple===idx)?null:idx;
+      saveLocal();render();
+    };
+    chips.appendChild(chip);
+  });
+  slot.appendChild(chips);
+  return slot;
+}
+
+function renderTips(meal){
+  var tips=[];
+  var stat=getMealStat(curDate,meal);
+  var spicy=getSpicyCount(curDate,meal);
+  var day=getDay(curDate);
+  var dishCount=0;
+  ROLE_ORDER.forEach(function(r){if(day[meal][r]!=null)dishCount++;});
+  if(spicy===0)tips.push("本餐还没有辣菜");
+  if(spicy>1)tips.push("本餐辣菜超过1道");
+  if(dishCount<3)tips.push("本餐至少选3道菜");
+  if(dishCount>4)tips.push("本餐最多4道菜");
+  if(stat.p<22)tips.push("本餐蛋白偏低");
+  var wrap=document.createElement("div");wrap.className="summary";
+  if(tips.length===0)wrap.innerHTML='<span class="ok">✓ 本餐搭配合理</span>';
+  else wrap.innerHTML=tips.map(function(t){return '<span class="warn">· '+t+'</span>';}).join("<br>");
+  return wrap;
+}
+
+function renderDayTotal(){
+  var lunch=getMealStat(curDate,"lunch");
+  var dinner=getMealStat(curDate,"dinner");
+  var p=lunch.p+dinner.p;var c=lunch.c+dinner.c;
+  var ok=(p>=55);
+  document.getElementById("dayTotal").innerHTML=
+    '<h3>全天正餐合计</h3>蛋白质 <b>'+p+'g</b>（目标≥55g）'+
+    (ok?' <span class="ok">✓</span>':' <span class="warn">未达标</span>')+
+    '<br>碳水 <b>'+c+'g</b><br>'+
+    '<span style="font-size:12px;color:#666">早餐加餐补足后，全天蛋白质可达80g以上</span>';
+}
+
+function showShop(){
+  var day=getDay(curDate);var items=[];
+  ["lunch","dinner"].forEach(function(m){
+    ROLE_ORDER.forEach(function(r){
+      var idx=day[m][r];
+      if(idx!=null)DISHES[idx].buy.forEach(function(x){
+        if(items.indexOf(x)<0)items.push(x);
+      });
+    });
+    if(day[m].staple!=null)STAPLES[day[m].staple].shop.forEach(function(x){
+      if(items.indexOf(x)<0)items.push(x);
+    });
+  });
+  document.getElementById("shopText").textContent=curDate+" "+weekdayCN(curDate)+"\n\n"+items.join("、");
+  var el=document.getElementById("shopList");
+  el.style.display=(el.style.display==="block")?"none":"block";
+  if(el.style.display==="block")el.scrollIntoView({behavior:"smooth"});
+}
+
+// ============ 分享功能 ============
+function buildMenuText(){
+  var day=getDay(curDate);
+  var lines=[];
+  lines.push("【控糖食谱】"+curDate+" "+weekdayCN(curDate));
+  ["lunch","dinner"].forEach(function(m){
+    var mealName=(m==="lunch")?"中餐":"晚餐";
+    var dishes=[];
+    ROLE_ORDER.forEach(function(r){
+      var idx=day[m][r];
+      if(idx!=null)dishes.push(DISHES[idx].n+((DISHES[idx].s)?"🌶":""));
+    });
+    var staple=day[m].staple!=null?STAPLES[day[m].staple].n:"（未选主食）";
+    var stat=getMealStat(curDate,m);
+    lines.push("");
+    lines.push("◆ "+mealName+"（蛋白"+stat.p+"g / 碳水"+stat.c+"g）");
+    lines.push("  "+dishes.join("、"));
+    lines.push("  主食："+staple);
+  });
+  // 买菜清单
+  var items=[];
+  ["lunch","dinner"].forEach(function(m){
+    ROLE_ORDER.forEach(function(r){
+      var idx=day[m][r];
+      if(idx!=null)DISHES[idx].buy.forEach(function(x){
+        if(items.indexOf(x)<0)items.push(x);
+      });
+    });
+    if(day[m].staple!=null)STAPLES[day[m].staple].shop.forEach(function(x){
+      if(items.indexOf(x)<0)items.push(x);
+    });
+  });
+  lines.push("");
+  lines.push("◆ 买菜清单");
+  lines.push("  "+items.join("、"));
+  // 全天合计
+  var l=getMealStat(curDate,"lunch");
+  var d=getMealStat(curDate,"dinner");
+  lines.push("");
+  lines.push("全天蛋白 "+(l.p+d.p)+"g ｜ 碳水 "+(l.c+d.c)+"g");
+  return lines.join("\n");
+}
+
+function encodeDayToURL(){
+  var day=getDay(curDate);
+  var payload={d:curDate,m:{}};
+  ["lunch","dinner"].forEach(function(m){
+    payload.m[m]={};
+    ROLE_ORDER.forEach(function(r){
+      var idx=day[m][r];
+      if(idx!=null){
+        // 存菜名，避免不同版本菜品库索引变化
+        payload.m[m][r]=DISHES[idx].n;
+      }
+    });
+    payload.m[m].staple=day[m].staple!=null?STAPLES[day[m].staple].n:null;
+  });
+  var json=JSON.stringify(payload);
+  var b64=btoa(unescape(encodeURIComponent(json)));
+  var base=location.href.split("?")[0].split("#")[0];
+  return base+"?menu="+encodeURIComponent(b64);
+}
+
+function showShareMenu(){
+  document.getElementById("shareText").value=buildMenuText();
+  document.getElementById("shareMsg").textContent="";
+  document.getElementById("shareMask").classList.add("on");
+}
+function closeShare(){
+  document.getElementById("shareMask").classList.remove("on");
+}
+function copyShareText(){
+  var ta=document.getElementById("shareText");
+  ta.select();ta.setSelectionRange(0,ta.value.length);
+  try{
+    var ok=document.execCommand("copy");
+    document.getElementById("shareMsg").textContent=ok?"✓ 已复制，去微信粘贴发送":"复制失败，请长按文本框手动复制";
+  }catch(e){
+    document.getElementById("shareMsg").textContent="复制失败，请长按文本框手动复制";
+  }
+}
+function copyShareLink(){
+  var url=encodeDayToURL();
+  document.getElementById("shareText").value=url;
+  var ta=document.getElementById("shareText");
+  ta.select();ta.setSelectionRange(0,ta.value.length);
+  try{
+    var ok=document.execCommand("copy");
+    document.getElementById("shareMsg").textContent=ok?"✓ 链接已复制，发到微信家人点开即可":"复制失败，请长按文本框手动复制";
+  }catch(e){
+    document.getElementById("shareMsg").textContent="复制失败，请长按文本框手动复制";
+  }
+}
+
+// ============ 读取 URL 中的菜单（家人打开链接时）============
+function tryLoadFromURL(){
+  try{
+    var params=new URLSearchParams(location.search);
+    var menu=params.get("menu");
+    if(!menu)return;
+    var json=decodeURIComponent(escape(atob(menu)));
+    var payload=JSON.parse(json);
+    if(!payload||!payload.d)return;
+    var date=payload.d;
+    var day={lunch:emptyMeal(),dinner:emptyMeal()};
+    ["lunch","dinner"].forEach(function(m){
+      if(!payload.m[m])return;
+      ROLE_ORDER.forEach(function(r){
+        var name=payload.m[m][r];
+        if(!name)return;
+        for(var k=0;k<DISHES.length;k++){
+          if(DISHES[k].n===name&&(r==="extra"?(DISHES[k].r==="sub"||DISHES[k].r==="veg"):DISHES[k].r===r)){
+            day[m][r]=k;break;
+          }
+        }
+      });
+      var sName=payload.m[m].staple;
+      if(sName){
+        for(var k=0;k<STAPLES.length;k++){
+          if(STAPLES[k].n===sName){day[m].staple=k;break;}
+        }
+      }
+    });
+    // 只读展示：不写入本地存储，避免覆盖家人自己的数据
+    store["__view__"+date]=day;
+    curDate=date;
+    return true;
+  }catch(e){return false;}
+}
+
+// ============ 日期切换 / 保存 ============
+function saveDay(){
+  saveLocal();
+  alert("已保存 "+curDate+(storageOK?"":"（注意：此浏览器不支持本地存储，刷新后会丢失）"));
+}
+function prevDay(){saveLocal();curDate=shiftDate(curDate,-1);render();}
+function nextDay(){saveLocal();curDate=shiftDate(curDate,1);render();}
+
+// ============ 启动 ============
+loadStore();
+var isViewMode=tryLoadFromURL();
+render();
+if(isViewMode){
+  // 只读模式提示
+  var tip=document.createElement("div");
+  tip.style.cssText="margin:10px;padding:10px 12px;background:#E2EFDA;border-radius:8px;font-size:13px;color:#2e7d32;line-height:1.6";
+  tip.innerHTML="这是家人分享的菜单，仅供查看。你自己使用请打开不带 <b>?menu=</b> 的原始网址。";
+  document.getElementById("app").insertBefore(tip,document.getElementById("app").firstChild);
+}
+if(!storageOK)showError("此浏览器禁用了本地存储。数据仅在当前页面有效。");
+</script>
+</body>
+</html>
