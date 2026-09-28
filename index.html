@@ -13,8 +13,8 @@
   --primary-dark:#2f5aa0;
   --bg-grad-1:#eef3fb;
   --bg-grad-2:#f4f6fa;
-  --card-alpha:0.52;
-  --card-alpha-strong:0.62;
+  --card-alpha:0.30;          /* 默认卡片透明度 30% */
+  --card-alpha-strong:0.42;   /* 底部按钮区默认透明度 */
   --card-blur:14px;
 }
 body.theme-blue{--primary:#4472C4;--primary-dark:#2f5aa0;--bg-grad-1:#eef3fb;--bg-grad-2:#f4f6fa;}
@@ -45,7 +45,7 @@ body.has-bg-image #bgLayer{display:block}
   position:fixed;
   inset:0;
   z-index:-1;
-  background:rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.12);
   pointer-events:none;
   display:none;
 }
@@ -113,7 +113,7 @@ header .tools button:active{background:rgba(255,255,255,.3)}
 #stickySummary .ok{color:#2e7d32;font-weight:bold}
 #stickySummary .warn{color:#C00000;font-weight:bold}
 
-/* ===== 餐卡片：半透明 ===== */
+/* ===== 餐卡片：半透明（可低至0%） ===== */
 .meal{margin:10px;background:rgba(255,255,255,var(--card-alpha));
       border-radius:12px;overflow:hidden;
       box-shadow:0 2px 12px rgba(0,0,0,.12);
@@ -193,6 +193,56 @@ header .tools button:active{background:rgba(255,255,255,.3)}
 .btn-primary{background:var(--primary);color:#fff}
 .btn-ghost{background:rgba(238,241,246,.85);color:#333}
 .btn-green{background:#2e7d32;color:#fff}
+
+/* ===== 日期切换按钮优化：更柔和可爱 ===== */
+.date-nav-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  font-size:13px;
+  font-weight:600;
+  color:#5a6b8a;
+  background:rgba(255,255,255,.75);
+  border:1px solid rgba(200,210,230,.8);
+  border-radius:22px;
+  padding:9px 6px;
+  transition:all .2s ease;
+  box-shadow:0 1px 3px rgba(100,120,160,.08);
+  letter-spacing:0.3px;
+}
+.date-nav-btn:active{
+  background:var(--primary);
+  color:#fff;
+  border-color:var(--primary-dark);
+  transform:scale(0.97);
+  box-shadow:0 2px 8px rgba(68,114,196,.25);
+}
+.date-nav-btn .nav-icon{
+  font-size:15px;
+  line-height:1;
+  opacity:.85;
+  transition:transform .2s ease;
+}
+.date-nav-btn:active .nav-icon{
+  transform:scale(1.15);
+  opacity:1;
+}
+.date-nav-btn .nav-text{
+  font-size:12px;
+  font-weight:500;
+}
+/* “今天”按钮单独一点温柔强调 */
+#todayBtn{
+  background:rgba(255,243,224,.9);
+  border-color:rgba(245,201,154,.8);
+  color:#8D4000;
+}
+#todayBtn:active{
+  background:#FB8C00;
+  border-color:#E65100;
+  color:#fff;
+}
 
 .modal-mask{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;
             align-items:center;justify-content:center;padding:16px}
@@ -307,9 +357,18 @@ header .tools button:active{background:rgba(255,255,255,.3)}
 <div class="actions">
   <div id="bottomLegend"></div>
   <div class="row">
-    <button class="btn-ghost" onclick="prevDay()">◀ 前一天</button>
-    <button class="btn-ghost" onclick="todayJump()">今天</button>
-    <button class="btn-ghost" onclick="nextDay()">后一天 ▶</button>
+    <button class="btn-ghost date-nav-btn" onclick="prevDay()">
+      <span class="nav-icon">🌿</span>
+      <span class="nav-text">前一天</span>
+    </button>
+    <button class="btn-ghost date-nav-btn" id="todayBtn" onclick="todayJump()">
+      <span class="nav-icon">🌸</span>
+      <span class="nav-text">今天</span>
+    </button>
+    <button class="btn-ghost date-nav-btn" onclick="nextDay()">
+      <span class="nav-text">后一天</span>
+      <span class="nav-icon">🌿</span>
+    </button>
   </div>
   <div class="row">
     <button class="btn-ghost" onclick="showShop()">买菜</button>
@@ -357,20 +416,20 @@ header .tools button:active{background:rgba(255,255,255,.3)}
     <div class="bg-preview" id="bgPreview"></div>
     <div class="bg-slider-row">
       <span>白罩</span>
-      <input type="range" id="overlayRange" min="0" max="80" value="15"
+      <input type="range" id="overlayRange" min="0" max="80" value="12"
              oninput="onOverlayChange(this.value)">
-      <span id="overlayVal">15%</span>
+      <span id="overlayVal">12%</span>
     </div>
     <div class="bg-hint">白罩越淡，背景图越清晰；白罩越浓，文字越容易读。</div>
 
     <div style="font-size:13px;color:#666;margin-top:14px;margin-bottom:6px">卡片透明度</div>
     <div class="alpha-slider-row">
       <span>透明</span>
-      <input type="range" id="alphaRange" min="20" max="90" value="52"
+      <input type="range" id="alphaRange" min="0" max="90" value="30"
              oninput="onAlphaChange(this.value)">
-      <span id="alphaVal">52%</span>
+      <span id="alphaVal">30%</span>
     </div>
-    <div class="bg-hint">数值越小，卡片越透明，背景图越明显；数值越大，卡片越实。</div>
+    <div class="bg-hint">数值越小，卡片越透明（最低0%），背景图越明显；数值越大，卡片越实。</div>
 
     <div class="row">
       <button class="btn-ghost" onclick="closeThemeModal()">关闭</button>
@@ -483,6 +542,7 @@ var DISHES=[
   {n:"萝卜炖排骨",r:"main",p:21,c:3,i:"猪",mg:"排骨",s:false,buy:["排骨","白萝卜"]},
   {n:"干锅排骨",r:"main",p:22,c:4,i:"猪",mg:"排骨",s:true,buy:["排骨","青椒","干辣椒"]},
   {n:"辣子鸡",r:"main",p:22,c:3,i:"鸡",mg:"鸡",s:true,buy:["鸡腿肉","干辣椒"]},
+  {n:"红烧鸡块",r:"main",p:22,c:5,i:"鸡",mg:"鸡",s:true,buy:["鸡腿肉","青椒","干辣椒"]},
   {n:"香菜牛肉",r:"main",p:25,c:3,i:"牛",mg:"牛",s:true,buy:["牛里脊","香菜"]},
   {n:"番茄牛肉",r:"main",p:24,c:6,i:"牛",mg:"牛",s:false,buy:["牛腩","番茄"]},
   {n:"红烧牛肉（少糖）",r:"main",p:25,c:8,i:"牛",mg:"牛",s:true,buy:["牛腩"]},
@@ -497,7 +557,7 @@ var DISHES=[
   {n:"清炒毛豆",r:"sub",p:11,c:8,i:"豆",s:false,buy:["毛豆"]},
   {n:"香干肉丝",r:"sub",p:16,c:6,i:"猪",s:true,buy:["香干","猪里脊"]},
   {n:"番茄炖豆腐",r:"sub",p:11,c:6,i:"豆",s:false,buy:["番茄","豆腐"]},
-  {n:"家常豆腐（少油版）",r:"sub",p:13,c:6,i:"豆",s:true,buy:["北豆腐","青椒","木耳"]},
+  {n:"家常豆腐",r:"sub",p:13,c:6,i:"豆",s:false,buy:["豆腐"]},
   {n:"豆腐蒸肉末",r:"sub",p:16,c:4,i:"豆",s:false,buy:["嫩豆腐","猪肉末"]},
   {n:"清炒菠菜",r:"veg",p:3,c:4,i:"素",s:false,buy:["菠菜"]},
   {n:"清炒包菜",r:"veg",p:2,c:4,i:"素",s:false,buy:["包包菜"]},
@@ -881,9 +941,8 @@ function loadBgImage(){
   var dataUrl=null;
   try{dataUrl=localStorage.getItem(BG_KEY);}catch(e){}
   applyBgImage(dataUrl);
-  // 默认白罩更淡：12%（原来15%，降低白罩让背景更清晰）
-  var v=getOverlayValue();
-  applyOverlay(v);
+  // 默认白罩 12%，更清晰
+  applyOverlay(getOverlayValue());
   applyCardAlpha(getCardAlpha());
 }
 function renderBgPreview(){
@@ -897,7 +956,7 @@ function renderBgPreview(){
   }
 }
 function getOverlayValue(){
-  // 默认白罩改为12%，让背景图更清晰（原来是15%）
+  // 默认白罩 12%
   var v=12;
   try{
     var s=localStorage.getItem(BG_OVERLAY_KEY);
@@ -918,22 +977,23 @@ function onOverlayChange(v){
   try{localStorage.setItem(BG_OVERLAY_KEY,String(v));}catch(e){}
 }
 
-// 卡片透明度（默认降低，让背景更透出来）
+// 卡片透明度：允许 0% ~ 90%
 function getCardAlpha(){
-  // 默认从52%降到45%，让背景更清晰
-  var v=45;
+  var v=30;   // 默认 30%，背景更清晰
   try{
     var s=localStorage.getItem(CARD_ALPHA_KEY);
     if(s!=null)v=parseInt(s,10);
   }catch(e){}
-  if(isNaN(v)||v<20)v=20;
+  if(isNaN(v)||v<0)v=0;     // 允许到 0%，完全透明
   if(v>90)v=90;
   return v;
 }
 function applyCardAlpha(v){
   var a=v/100;
   document.documentElement.style.setProperty("--card-alpha",a);
-  document.documentElement.style.setProperty("--card-alpha-strong",Math.min(a+0.1,0.95));
+  // 底部按钮区给一个最低保底，避免完全看不见按钮
+  var strong=Math.min(Math.max(a,0.15)+0.1, 0.95);
+  document.documentElement.style.setProperty("--card-alpha-strong",strong);
 }
 function onAlphaChange(v){
   v=parseInt(v,10);
@@ -1517,10 +1577,9 @@ function tryLoadFromURL(){
   }catch(e){return false;}
 }
 
-// ============ 优化保存提示（温暖呵护） ============
+// ============ 温暖保存提示 ============
 function saveDay(){
   saveLocal();
-  // 温暖贴心的保存提示语
   var msg = "💗 已为你保存 " + curDate + " 的菜单～\n" +
             "你认真选好的每一餐，都是给宝宝最温柔的爱。\n" +
             "辛苦了，记得按时吃饭，好好休息哦 🌸";
